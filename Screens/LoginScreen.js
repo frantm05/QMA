@@ -24,7 +24,7 @@ const LoginScreen = ({ navigation }) => {
 
             await StorageService.saveUserID(username);
 
-            navigation.navigate("Home");
+            navigation.navigate("DomainSelection");
         } catch (error) {
             handleError(error, 'Login');
         } finally {

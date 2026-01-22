@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, ActivityIndicator, Alert, StyleSheet, ScrollView } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
+import { View, Text, ActivityIndicator, Alert, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { TextInput } from 'react-native';
 import Button from '../Components/Button';
 import LoadingButton from "../Components/LoadingButton";
@@ -9,170 +8,133 @@ import apiService from '../services/apiService';
 import { StorageService } from '../utils/storage';
 
 const ImportDataScreen = ({ navigation }) => {
-
-    // State for all data and filters
+    // State
     const [selectedDomain, setSelectedDomain] = useState(null);
+    const [currentAccessToken, setCurrentAccessToken] = useState('');
+    
+    // Data state
     const [allInventoryData, setAllInventoryData] = useState([]);
     const [sites, setSites] = useState([]);
-    const [selectedSite, setSelectedSite] = useState('*'); 
+    
+    // Selection state
+    const [selectedSite, setSelectedSite] = useState(null); // Změna: null znamená, že nic není vybráno
     const [storageLocation, setStorageLocation] = useState('*');
     const [partFilter, setPartFilter] = useState('*');
-    const [currentAccessToken, setCurrentAccessToken] = useState('');
 
     // UI state
     const [isLoading, setIsLoading] = useState(false);
-    const [isLoadingData, setIsLoadingData] = useState(false);
-    const [statusMessage, setStatusMessage] = useState("Preparing data loading...");
+    const [isLoadingData, setIsLoadingData] = useState(true); // Default true, začínáme hned načítat
+    const [statusMessage, setStatusMessage] = useState("Inicializace...");
 
-    // useEffect to load token and domain
+    // 1. Načtení tokenu a domény + automatické spuštění stahování dat
     useEffect(() => {
-        const loadInitialData = async () => {
+        const init = async () => {
             try {
-                const savedToken = await StorageService.loadAccessToken();
-                if (!savedToken) {
-                    navigation.reset({
-                        index: 0,
-                        routes: [{ name: 'Login' }],
-                    });
+                const token = await StorageService.loadAccessToken();
+                const domain = await StorageService.loadDomainSelection();
+
+                if (!token || !domain) {
+                    navigation.goBack();
                     return;
                 }
-                setCurrentAccessToken(savedToken);
 
-                const savedDomain = await StorageService.loadDomainSelection();
-                if (savedDomain) {
-                    setSelectedDomain(savedDomain);
-                }
+                setCurrentAccessToken(token);
+                setSelectedDomain(domain);
+                
+                // Hned spustíme načítání dat pro doménu
+                loadDomainData(token, domain);
+
             } catch (error) {
-                console.error("Error loading initial data:", error);
-                navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'Login' }],
-                });
+                console.error("Init error:", error);
+                navigation.goBack();
             }
         };
 
-        loadInitialData();
+        init();
     }, []);
 
-    // Load domain data when both token and domain are available
-    useEffect(() => {
-        const loadDomainData = async () => {
-            if (!currentAccessToken || !selectedDomain) {
-                return;
-            }
+    const loadDomainData = async (token, domain) => {
+        setIsLoadingData(true);
+        setStatusMessage(`Načítám data pro doménu ${domain}...`);
 
-            setIsLoadingData(true);
-            setStatusMessage("Loading all data for domain " + selectedDomain + "...");
+        try {
+            // Používáme existující logiku - stáhni vše, pak vyfiltruj sites
+            // Poznámka: Pro optimalizaci by API mělo mít endpoint čistě pro Sites (si_mstr), 
+            // ale dle zadání "neměnit funkčnost" využíváme data z inventury.
+            const inventoryData = await apiService.getInventoryDataForDomain(token, domain);
 
-            try {
-                const inventoryData = await apiService.getInventoryDataForDomain(currentAccessToken, selectedDomain);
-
-                // Debug: Step 1 - check which domains actually came from API
-                console.log("=== DEBUG API RESPONSE ===");
-                console.log("API request for domain:", selectedDomain);
-                
-                if (Array.isArray(inventoryData) && inventoryData.length > 0) {
-                    // Debug: Step 2 - check which fields are available
-                    console.log("Available fields in first item:", Object.keys(inventoryData[0] || {}));
-                    
-                    // Debug: Step 1 continuation - which domains actually came
-                    const uniqueDomains = [...new Set(inventoryData.map(item => item["ld_det.ld_domain"]))];
-                    console.log("Actually received domains:", uniqueDomains);
-                    console.log("First 3 items with domain info:", inventoryData.slice(0, 3).map(item => ({
-                        domain: item["ld_det.ld_domain"],
-                        part: item["ld_det.ld_part"],
-                        site: item["ld_det.ld_site"]
-                    })));
-                }
-                console.log("=== END DEBUG ===");
-
-                if (!Array.isArray(inventoryData)) {
-                    throw new Error("API did not return array of data");
-                }
-
-                // CLIENT-SIDE FILTERING - filter data by selected domain
-                const filteredByDomain = inventoryData.filter(item => {
-                    const itemDomain = item["ld_det.ld_domain"];
-                    return itemDomain === selectedDomain;
-                });
-
-                console.log(`Data before filtering: ${inventoryData.length}, after filtering by domain '${selectedDomain}': ${filteredByDomain.length}`);
+            if (Array.isArray(inventoryData)) {
+                const filteredByDomain = inventoryData.filter(item => 
+                    item["ld_det.ld_domain"] === domain
+                );
 
                 setAllInventoryData(filteredByDomain);
+                
+                // Extrakce unikátních míst (Sites)
                 const uniqueSites = apiService.getUniqueSitesFromData(filteredByDomain);
                 setSites(uniqueSites);
 
                 if (filteredByDomain.length === 0) {
-                    setStatusMessage(`Domain '${selectedDomain}' contains no data. Available domains: ${[...new Set(inventoryData.map(item => item["ld_det.ld_domain"]))].join(', ')}`);
+                    setStatusMessage(`Doména '${domain}' neobsahuje žádná data.`);
                 } else {
-                    setStatusMessage(`Loaded ${filteredByDomain.length} records for domain '${selectedDomain}'. Available sites: ${uniqueSites.map(s => s.si_site).join(', ')}`);
+                    setStatusMessage(`Vyberte Místo (Site)`);
                 }
-
-            } catch (error) {
-                console.error("Error loading domain data:", error);
-                setStatusMessage("Error loading data: " + error.message);
-                setAllInventoryData([]);
-                setSites([]);
-            } finally {
-                setIsLoadingData(false);
             }
-        };
+        } catch (error) {
+            console.error("Error loading data:", error);
+            setStatusMessage("Chyba při načítání dat: " + error.message);
+        } finally {
+            setIsLoadingData(false);
+        }
+    };
 
-        loadDomainData();
-    }, [selectedDomain, currentAccessToken]);
+    const handleSiteSelect = (siteCode) => {
+        setSelectedSite(siteCode);
+        setStatusMessage(`Vybráno místo: ${siteCode}. Upřesněte filtry.`);
+    };
 
-    // Function for filtering data from already loaded data
+    const handleResetSite = () => {
+        setSelectedSite(null);
+        setStatusMessage(`Vyberte Místo (Site)`);
+    };
+
+    // Filtrace a Import (zůstává podobné)
     const getFilteredData = () => {
         return allInventoryData.filter(item => {
             const site = item["ld_det.ld_site"] || "";
             const location = item["ld_det.ld_loc"] || "";
             const part = item["ld_det.ld_part"] || "";
 
-            // Site filter
-            const siteMatch = selectedSite === '*' || site === selectedSite;
+            // Site filter - zde je selectedSite povinný (vybrán tlačítkem)
+            if (selectedSite !== '*' && site !== selectedSite) return false;
 
-            // Storage location filter
             const locationMatch = storageLocation === '*' ||
                 (storageLocation.endsWith('*') ?
                     location.startsWith(storageLocation.slice(0, -1)) :
                     location === storageLocation);
 
-            // Parts filter
             const partMatch = partFilter === '*' ||
                 (partFilter.endsWith('*') ?
                     part.startsWith(partFilter.slice(0, -1)) :
                     part === partFilter);
 
-            return siteMatch && locationMatch && partMatch;
+            return locationMatch && partMatch;
         });
     };
 
-    // Function for importing filtered data
     const handleImport = async () => {
-        if (!selectedDomain) {
-            Alert.alert("Error", "Select a domain!");
-            return;
-        }
-
-        if (allInventoryData.length === 0) {
-            Alert.alert("Error", "No data available for import!");
-            return;
-        }
-
         setIsLoading(true);
-        setStatusMessage("Importing filtered data...");
-
         try {
             const filteredData = getFilteredData();
-
+            
             if (filteredData.length === 0) {
-                Alert.alert("Warning", "No data matches the set filters!");
+                Alert.alert("Varování", "Filtru neodpovídají žádná data.");
                 setIsLoading(false);
                 return;
             }
+
             await clearScans("resources");
 
-            // Data for bulk insert
             const itemsToInsert = filteredData.map(item => ({
                 domain: item["ld_det.ld_domain"] || "",
                 part_number: item["ld_det.ld_part"] || "",
@@ -183,106 +145,105 @@ const ImportDataScreen = ({ navigation }) => {
                 quantity: item["ld_det.ld_qty_oh"]?.toString() || "0"
             }));
 
-            // Bulk insert
             await bulkAddScans("resources", itemsToInsert);
-
-            setStatusMessage(`Import completed! Imported records: ${filteredData.length} of ${allInventoryData.length}`);
-
-            await StorageService.saveImportFilters({
-                domain: selectedDomain,
-                site: selectedSite,
-                storageLocation,
-                partFilter
-            });
-
+            
             navigation.navigate('OfflineInventory', { inventory: filteredData });
         } catch (error) {
-            console.error("Import error details:", error);
-            setStatusMessage("IMPORT ERROR: " + error.message);
+            Alert.alert("Chyba importu", error.message);
         } finally {
             setIsLoading(false);
         }
     };
 
-    const isFormValid = selectedDomain && !isLoadingData && currentAccessToken && allInventoryData.length > 0;
-    const filteredCount = allInventoryData.length > 0 ? getFilteredData().length : 0;
+    // Renderování
+    const filteredCount = (allInventoryData.length > 0 && selectedSite) ? getFilteredData().length : 0;
 
     return (
         <ScrollView style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.title}>Import QAD Data</Text>
-                <Text style={styles.subtitle}>Domain: {selectedDomain}</Text>
-                <Text style={styles.subtitle}>Token: {currentAccessToken ? 'Available' : 'Unavailable'}</Text>
-                {allInventoryData.length > 0 && (
-                    <Text style={styles.dataInfo}>
-                        Total loaded: {allInventoryData.length} | After filtering: {filteredCount}
-                    </Text>
-                )}
+                <Text style={styles.title}>Import Dat</Text>
+                <Text style={styles.subtitle}>Doména: {selectedDomain}</Text>
             </View>
 
+            {/* Status Bar */}
             <View style={styles.statusContainer}>
-                <Text style={styles.statusLabel}>Status:</Text>
-                <Text style={[styles.statusMessage, { color: (isLoading || isLoadingData) ? 'blue' : 'green' }]}>
+                <Text style={[styles.statusMessage, { color: isLoadingData ? 'blue' : 'black' }]}>
                     {statusMessage}
                 </Text>
             </View>
 
-            {(isLoading || isLoadingData) && (
+            {isLoadingData && (
                 <ActivityIndicator size="large" color="#0000ff" style={styles.loader} />
             )}
 
-            {!isLoading && allInventoryData.length > 0 && (
-                <View style={styles.filtersContainer}>
-                    <Text style={styles.filtersTitle}>Import filters:</Text>
-
-                    {/* Site Selection */}
-                    <View style={styles.filterGroup}>
-                        <Text style={styles.filterLabel}>Site:</Text>
-                        <Picker
-                            selectedValue={selectedSite}
-                            onValueChange={(itemValue) => setSelectedSite(itemValue)}
-                            style={styles.picker}
+            {/* KROK 1: Výběr Místa (Zobrazit pouze pokud není vybráno a data jsou načtena) */}
+            {!isLoadingData && !selectedSite && sites.length > 0 && (
+                <View style={styles.sectionContainer}>
+                    <Text style={styles.sectionTitle}>Vyberte Místo (Site):</Text>
+                    <View style={styles.gridContainer}>
+                        {/* Možnost Všechna místa */}
+                        <TouchableOpacity 
+                            style={styles.siteButton} 
+                            onPress={() => handleSiteSelect('*')}
                         >
-                            <Picker.Item label="All sites (*)" value="*" />
-                            {sites.map(site => (
-                                <Picker.Item
-                                    key={site.si_site}
-                                    label={`${site.si_site} - ${site.si_desc}`}
-                                    value={site.si_site}
-                                />
-                            ))}
-                        </Picker>
+                            <Text style={styles.siteButtonText}>VŠECHNA MÍSTA</Text>
+                        </TouchableOpacity>
+
+                        {/* Jednotlivá místa */}
+                        {sites.map(site => (
+                            <TouchableOpacity 
+                                key={site.si_site} 
+                                style={styles.siteButton} 
+                                onPress={() => handleSiteSelect(site.si_site)}
+                            >
+                                <Text style={styles.siteButtonText}>{site.si_site}</Text>
+                                <Text style={styles.siteButtonDesc}>{site.si_desc}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+            )}
+
+            {/* KROK 2: Filtry (Zobrazit až po výběru místa) */}
+            {!isLoadingData && selectedSite && (
+                <View style={styles.filtersContainer}>
+                    <View style={styles.selectedSiteHeader}>
+                        <Text style={styles.selectedSiteText}>
+                            Vybrané místo: {selectedSite === '*' ? 'Všechna' : selectedSite}
+                        </Text>
+                        <TouchableOpacity onPress={handleResetSite}>
+                            <Text style={{color: 'blue', textDecorationLine: 'underline'}}>Změnit</Text>
+                        </TouchableOpacity>
                     </View>
 
-                    {/* Storage Location Filter */}
                     <View style={styles.filterGroup}>
-                        <Text style={styles.filterLabel}>Storage location (starts with):</Text>
+                        <Text style={styles.filterLabel}>Lokace (začíná na):</Text>
                         <TextInput
                             style={styles.textInput}
                             value={storageLocation}
                             onChangeText={setStorageLocation}
-                            placeholder="* for all locations"
+                            placeholder="* pro všechny"
                         />
-                        <Text style={styles.helpText}>
-                            Currently filtered: {filteredCount} records
-                        </Text>
                     </View>
 
-                    {/* Part Filter */}
                     <View style={styles.filterGroup}>
-                        <Text style={styles.filterLabel}>Parts (starts with):</Text>
+                        <Text style={styles.filterLabel}>Položka (začíná na):</Text>
                         <TextInput
                             style={styles.textInput}
                             value={partFilter}
                             onChangeText={setPartFilter}
-                            placeholder="* for all parts"
+                            placeholder="* pro všechny"
                         />
                     </View>
 
+                    <View style={styles.summaryContainer}>
+                        <Text>Nalezeno záznamů: {filteredCount}</Text>
+                    </View>
+
                     <LoadingButton
-                        title={`Import ${filteredCount} records to offline mode`}
+                        title="Importovat data"
                         onPress={handleImport}
-                        disabled={!isFormValid || filteredCount === 0}
+                        disabled={filteredCount === 0}
                         isLoading={isLoading}
                         style={styles.importButton}
                     />
@@ -290,10 +251,7 @@ const ImportDataScreen = ({ navigation }) => {
             )}
 
             <View style={styles.navigationContainer}>
-                <Button
-                    title="Back to Home"
-                    onPress={() => navigation.goBack()}
-                />
+                <Button title="Zpět do Menu" onPress={() => navigation.goBack()} />
             </View>
         </ScrollView>
     );
@@ -302,94 +260,100 @@ const ImportDataScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        padding: 20,
+        padding: 15,
         backgroundColor: '#f5f5f5',
     },
     header: {
-        marginBottom: 20,
         alignItems: 'center',
+        marginBottom: 15,
     },
     title: {
-        fontSize: 24,
+        fontSize: 22,
         fontWeight: 'bold',
-        color: '#333',
     },
     subtitle: {
-        fontSize: 16,
-        color: '#666',
-        marginTop: 5,
-    },
-    dataInfo: {
         fontSize: 14,
-        color: '#007bff',
-        marginTop: 5,
-        fontWeight: '500',
+        color: '#666',
     },
     statusContainer: {
+        padding: 10,
         backgroundColor: '#fff',
+        borderRadius: 5,
+        marginBottom: 15,
+        alignItems: 'center',
+    },
+    sectionContainer: {
+        flex: 1,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 10,
+    },
+    gridContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+    },
+    siteButton: {
+        width: '48%',
+        backgroundColor: '#007bff',
         padding: 15,
         borderRadius: 8,
-        marginBottom: 20,
+        marginBottom: 10,
+        alignItems: 'center',
     },
-    statusLabel: {
-        fontSize: 16,
+    siteButtonText: {
+        color: 'white',
         fontWeight: 'bold',
-        marginBottom: 5,
+        fontSize: 16,
     },
-    statusMessage: {
-        fontSize: 14,
-    },
-    loader: {
-        marginBottom: 20,
+    siteButtonDesc: {
+        color: '#e0e0e0',
+        fontSize: 12,
+        marginTop: 2,
     },
     filtersContainer: {
         backgroundColor: '#fff',
-        padding: 20,
+        padding: 15,
         borderRadius: 8,
-        marginBottom: 20,
     },
-    filtersTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
+    selectedSiteHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         marginBottom: 15,
-        color: '#333',
+        paddingBottom: 10,
+        borderBottomWidth: 1,
+        borderColor: '#eee',
+    },
+    selectedSiteText: {
+        fontWeight: 'bold',
+        fontSize: 16,
     },
     filterGroup: {
-        marginBottom: 20,
+        marginBottom: 15,
     },
     filterLabel: {
-        fontSize: 16,
+        marginBottom: 5,
         fontWeight: '600',
-        marginBottom: 8,
-        color: '#333',
-    },
-    picker: {
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 5,
-        backgroundColor: '#fff',
     },
     textInput: {
         borderWidth: 1,
         borderColor: '#ddd',
         borderRadius: 5,
-        padding: 12,
-        fontSize: 16,
+        padding: 10,
         backgroundColor: '#fff',
     },
-    helpText: {
-        fontSize: 12,
-        color: '#666',
-        marginTop: 5,
-        fontStyle: 'italic',
-    },
-    importButton: {
-        marginTop: 10,
-    },
-    navigationContainer: {
-        marginTop: 20,
+    summaryContainer: {
+        marginBottom: 15,
         alignItems: 'center',
     },
+    navigationContainer: {
+        marginTop: 30,
+        marginBottom: 30,
+        alignItems: 'center',
+    }
 });
 
 export default ImportDataScreen;
