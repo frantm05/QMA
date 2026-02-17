@@ -60,7 +60,7 @@ const DomainSelectionScreen = ({ navigation }) => {
                 {domains.map(domain => (
                     <View key={domain.key} style={styles.buttonWrapper}>
                         <Button 
-                            title={`${domain.name} ${domain.description ? '- ' + domain.description : ''}`} 
+                            title={domain.name} 
                             onPress={() => selectDomain(domain.name)} 
                         />
                     </View>
