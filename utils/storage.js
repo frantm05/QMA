@@ -1,110 +1,105 @@
+// utils/storage.js
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const KEYS = {
+    ACCESS_TOKEN: 'access_token',
+    USER_ID: 'user_id',
+    DOMAIN: 'selected_domain',
+    // Nové klíče pro nastavení
+    SETTINGS: 'app_settings'
+};
+
+const DEFAULT_SETTINGS = {
+    smPrefix: '',           // Prefix Skladového Místa (např. "L")
+    itemPrefix: 'R',        // Prefix Reference (např. "R")
+    resetSmAfterItem: false,// "Sken SM po každé zásobě" (ANO/NE)
+    checkAgainstDb: true,   // "Dohledání Reference v import. datech" (ANO/NE)
+    manualQty: true         // Zadání množství (ANO/NE) - v PDF "Zadání Množství"
+};
+
 export const StorageService = {
-    async saveDomainSelection(domain) {
-        try {
-            await AsyncStorage.setItem('selectedDomain', domain);
-        } catch (error) {
-            console.error('Error saving domain selection:', error);
-        }
-    },
+    // ... (existující metody loadAccessToken, saveAccessToken atd. nech beze změny) ...
 
-    async loadDomainSelection() {
+    saveAccessToken: async (token) => {
         try {
-            const domain = await AsyncStorage.getItem('selectedDomain');
-            return  domain;
-        } catch (error) {
-            console.error('Error loading domain selection:', error);
-            return null;
-        }
-    },
-
-    async clearDomainSelection() {
-        try {
-            await AsyncStorage.removeItem('selectedDomain');
-        } catch (error) {
-            console.error('Error clearing domain selection:', error);
-        }
-    },
-
-    // New methods for access token
-    async saveAccessToken(accessToken) {
-        try {
-            await AsyncStorage.setItem('accessToken', accessToken);
+            await AsyncStorage.setItem(KEYS.ACCESS_TOKEN, token);
         } catch (error) {
             console.error('Error saving access token:', error);
         }
     },
 
-    async loadAccessToken() {
+    loadAccessToken: async () => {
         try {
-            const accessToken = await AsyncStorage.getItem('accessToken');
-            return accessToken;
+            return await AsyncStorage.getItem(KEYS.ACCESS_TOKEN);
         } catch (error) {
             console.error('Error loading access token:', error);
             return null;
         }
     },
 
-    async clearAccessToken() {
+    saveUserID: async (userID) => {
         try {
-            await AsyncStorage.removeItem('accessToken');
-        } catch (error) {
-            console.error('Error clearing access token:', error);
-        }
-    },
-
-    // Updated clearAll method for sign out
-    async clearAllUserData() {
-        try {
-            await AsyncStorage.multiRemove(['selectedDomain', 'accessToken', 'importFilters', 'userID']);
-        } catch (error) {
-            console.error('Error clearing all user data:', error);
-        }
-    },
-
-    // New methods for import filters
-    async saveImportFilters(filters) {
-        try {
-            await AsyncStorage.setItem('importFilters', JSON.stringify(filters));
-        } catch (error) {
-            console.error('Error saving import filters:', error);
-        }
-    },
-
-    async loadImportFilters() {
-        try {
-            const filtersString = await AsyncStorage.getItem('importFilters');
-            return filtersString ? JSON.parse(filtersString) : null;
-        } catch (error) {
-            console.error('Error loading import filters:', error);
-            return null;
-        }
-    },
-
-    async clearImportFilters() {
-        try {
-            await AsyncStorage.removeItem('importFilters');
-        } catch (error) {
-            console.error('Error clearing import filters:', error);
-        }
-    },
-
-    async saveUserID(userID) {
-        try {
-            await AsyncStorage.setItem('userID', userID);
+            await AsyncStorage.setItem(KEYS.USER_ID, userID);
         } catch (error) {
             console.error('Error saving user ID:', error);
         }
     },
 
-    async loadUserID() {
+    loadUserID: async () => {
         try {
-            const userID = await AsyncStorage.getItem('userID');
-            return userID;
+            return await AsyncStorage.getItem(KEYS.USER_ID);
         } catch (error) {
             console.error('Error loading user ID:', error);
             return null;
+        }
+    },
+
+    saveDomainSelection: async (domain) => {
+        try {
+            await AsyncStorage.setItem(KEYS.DOMAIN, domain);
+        } catch (error) {
+            console.error('Error saving domain:', error);
+        }
+    },
+
+    loadDomainSelection: async () => {
+        try {
+            return await AsyncStorage.getItem(KEYS.DOMAIN);
+        } catch (error) {
+            console.error('Error loading domain:', error);
+            return null;
+        }
+    },
+
+    clearAuth: async () => {
+        try {
+            await AsyncStorage.multiRemove([KEYS.ACCESS_TOKEN, KEYS.USER_ID, KEYS.DOMAIN]);
+        } catch (error) {
+            console.error('Error clearing auth:', error);
+        }
+    },
+
+    // --- NOVÉ METODY PRO NASTAVENÍ ---
+
+    saveSettings: async (settings) => {
+        try {
+            const jsonValue = JSON.stringify(settings);
+            await AsyncStorage.setItem(KEYS.SETTINGS, jsonValue);
+        } catch (error) {
+            console.error('Error saving settings:', error);
+        }
+    },
+
+    loadSettings: async () => {
+        try {
+            const jsonValue = await AsyncStorage.getItem(KEYS.SETTINGS);
+            if (jsonValue != null) {
+                return { ...DEFAULT_SETTINGS, ...JSON.parse(jsonValue) };
+            }
+            return DEFAULT_SETTINGS;
+        } catch (error) {
+            console.error('Error loading settings:', error);
+            return DEFAULT_SETTINGS;
         }
     }
 };

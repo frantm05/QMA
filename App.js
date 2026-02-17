@@ -8,6 +8,7 @@ import ReaderScreen from './Screens/ReaderScreen';
 import ImportDataScreen from './Screens/ImportDataScreen';
 import OfflineInventory from './Screens/OfflineInventory';
 import DomainSelectionScreen from './Screens/DomainSelectionScreen';
+import SettingsScreen from './Screens/SettingsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -21,6 +22,7 @@ export default function App() {
         <Stack.Screen name="Reader" component={ReaderScreen} />
         <Stack.Screen name="ImportData" component={ImportDataScreen} />
         <Stack.Screen name="OfflineInventory" component={OfflineInventory} />
+        <Stack.Screen name="Settings" component={SettingsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

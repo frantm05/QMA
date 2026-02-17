@@ -1,106 +1,142 @@
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet } from "react-native";
-import Button from "../Components/Button";
+// Screens/HomeScreen.js
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Alert } from 'react-native';
+import Button from '../Components/Button';
 import { StorageService } from '../utils/storage';
 
-const HomeScreen = ({ navigation }) => {
-    const [selectedDomain, setSelectedDomain] = useState(null);
-    const [userID, setUserID] = useState('');
+const HomeScreen = ({ navigation, route }) => {
+    // Získáme parametr z navigace, zda jsme offline
+    // Pokud jdeme přes DomainSelection (online), parametr tam nebude, takže default false.
+    // Ale pozor: musíme zjistit doménu nebo "Offline Mode" text.
+    
+    const [displayHeader, setDisplayHeader] = useState('Načítání...');
+    const [isOfflineMode, setIsOfflineMode] = useState(false);
+    const [userId, setUserId] = useState('');
 
     useEffect(() => {
-        const loadContext = async () => {
-            const domain = await StorageService.loadDomainSelection();
-            const user = await StorageService.loadUserID();
-            
-            if (!domain) {
-                // Pokud není vybrána doména, vrať se na výběr
-                navigation.replace("DomainSelection");
-                return;
-            }
-            
-            setSelectedDomain(domain);
-            setUserID(user);
-        };
-        
-        loadContext();
-    }, []); 
+        const init = async () => {
+            // Parametr předaný z LoginScreen
+            const offlineParam = route.params?.isOffline || false;
+            setIsOfflineMode(offlineParam);
 
-    const handleSignOut = async () => {
-        await StorageService.clearAllUserData();
-        navigation.reset({
-            index: 0,
-            routes: [{ name: 'Login' }],
-        });
-    }
+            const storedUser = await StorageService.loadUserID();
+            setUserId(storedUser || 'Neznámý');
+
+            if (offlineParam) {
+                setDisplayHeader("Režim: OFFLINE");
+            } else {
+                const domain = await StorageService.loadDomainSelection();
+                setDisplayHeader(`Doména: ${domain}`);
+            }
+        };
+        init();
+    }, [route.params]);
+
+    const handleLogout = async () => {
+        await StorageService.clearAuth();
+        navigation.replace("Login");
+    };
 
     return (
         <View style={styles.container}>
-            {/* ZÁHLAVÍ S KONTEXTEM */}
-            <View style={styles.header}>
-                <Text style={styles.headerText}>Uživatel: {userID}</Text>
-                <Text style={styles.headerDomain}>Doména: {selectedDomain}</Text>
+            {/* Hlavička s informacemi */}
+            <View style={styles.headerContainer}>
+                <Text style={styles.userText}>Uživatel: {userId}</Text>
+                <Text style={[styles.domainText, isOfflineMode && styles.offlineText]}>
+                    {displayHeader}
+                </Text>
             </View>
 
-            <View style={styles.content}>
-                <Text style={styles.title}>Hlavní Menu</Text>
-                
-                <View style={styles.buttonContainer}>
+            <Text style={styles.menuTitle}>Hlavní Menu</Text>
+
+            <View style={styles.menuContainer}>
+                {/* 1. Import Dat - POUZE ONLINE */}
+                {!isOfflineMode && (
+                    <View style={styles.buttonWrapper}>
+                        <Button 
+                            title="Import Dat" 
+                            onPress={() => navigation.navigate("ImportData")} 
+                        />
+                    </View>
+                )}
+
+                {/* 2. Čtečka - VŽDY */}
+                <View style={styles.buttonWrapper}>
                     <Button 
-                        title="Import Dat" 
-                        onPress={() => navigation.navigate("ImportData")} 
+                        title="Čtečka" 
+                        onPress={() => navigation.navigate("Reader")} 
                     />
                 </View>
-                <View style={styles.buttonContainer}>
-                    <Button title="Čtečka" onPress={() => navigation.navigate("Reader")} />
+
+                {/* 3. Nastavení - VŽDY (důležité pro Offline) */}
+                <View style={styles.buttonWrapper}>
+                    <Button 
+                        title="Nastavení" 
+                        onPress={() => navigation.navigate("Settings")} 
+                        style={{backgroundColor: '#6c757d'}} // Šedá barva pro odlišení
+                    />
                 </View>
-                <View style={styles.buttonContainer}>
-                    <Button title="Odhlásit" onPress={handleSignOut} />
-                </View>
+            </View>
+
+            <View style={styles.logoutWrapper}>
+                <Button 
+                    title="Odhlásit" 
+                    onPress={handleLogout} 
+                    style={{backgroundColor: '#dc3545'}} 
+                />
             </View>
         </View>
     );
-}
+};
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        alignItems: 'center',
+        padding: 20,
         backgroundColor: '#fff',
     },
-    header: {
-        paddingTop: 50,
-        paddingBottom: 20,
-        paddingHorizontal: 20,
-        backgroundColor: '#f0f0f0',
-        borderBottomWidth: 1,
-        borderBottomColor: '#ccc',
+    headerContainer: {
+        width: '100%',
+        padding: 15,
+        backgroundColor: '#f8f9fa',
+        borderRadius: 8,
+        marginBottom: 30,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#dee2e6',
+    },
+    userText: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 5,
+    },
+    domainText: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#007bff',
+    },
+    offlineText: {
+        color: '#dc3545', // Červená pro offline
+    },
+    menuTitle: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        marginBottom: 30,
+    },
+    menuContainer: {
         width: '100%',
         alignItems: 'center',
     },
-    headerText: {
-        fontSize: 14,
-        color: '#666',
+    buttonWrapper: {
+        width: '80%',
+        marginBottom: 15,
     },
-    headerDomain: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#333',
-        marginTop: 5,
-    },
-    content: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 20,
-    },
-    title: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        marginBottom: 40,
-    },
-    buttonContainer: {
-        marginTop: 15,
-        width: '70%',
-    },
+    logoutWrapper: {
+        marginTop: 'auto', // Tlačítko dolů
+        width: '60%',
+        marginBottom: 20,
+    }
 });
 
 export default HomeScreen;

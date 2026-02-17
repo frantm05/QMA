@@ -30,13 +30,18 @@ class DatabaseService {
             CREATE TABLE IF NOT EXISTS ${DATABASE_CONFIG.TABLES.INVENTORY_SCANS} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, 
                 domain TEXT,
+                site TEXT,              -- Přidáno: Site (Místo)
                 part_number TEXT,
-                location TEXT, 
-                storage_location TEXT, 
+                location TEXT,          -- Toto je Skladové místo (SM)
+                original_location_scan TEXT, -- Původní sken SM s prefixem
                 batch TEXT, 
                 reference TEXT, 
-                quantity TEXT,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                original_reference_scan TEXT, -- Původní sken Reference s prefixem
+                quantity REAL,          -- Změněno na REAL pro počty
+                scan_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                scanned_by TEXT,        -- Uživatel (přihlášený nebo 'Spočetl')
+                is_manual_qty BOOLEAN DEFAULT 0,
+                status TEXT             -- 'NEW', 'MATCH_OK', 'MATCH_FAIL', atd.
             );
         `);
     }
