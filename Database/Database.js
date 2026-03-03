@@ -6,13 +6,25 @@ const db = SQLite.openDatabaseAsync(DATABASE_CONFIG.DB_NAME);
 export default db;
 
 class DatabaseService {
+    // Původní initDB s DROP - používá se při ONLINE loginu (čistý start)
     async initDB() {
-        console.log("Initializing database...");
+        console.log("Initializing database (full reset)...");
         const database = await db;
 
         await database.execAsync(`DROP TABLE IF EXISTS ${DATABASE_CONFIG.TABLES.RESOURCES};`);
         await database.execAsync(`DROP TABLE IF EXISTS ${DATABASE_CONFIG.TABLES.INVENTORY_SCANS};`);
 
+        await this._createTables(database);
+    }
+
+    // Bezpečná inicializace BEZ DROP - pro offline (zachová existující data)
+    async initDBSafe() {
+        console.log("Initializing database (safe, no drop)...");
+        const database = await db;
+        await this._createTables(database);
+    }
+
+    async _createTables(database) {
         await database.execAsync(`
             CREATE TABLE IF NOT EXISTS ${DATABASE_CONFIG.TABLES.RESOURCES} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -30,18 +42,18 @@ class DatabaseService {
             CREATE TABLE IF NOT EXISTS ${DATABASE_CONFIG.TABLES.INVENTORY_SCANS} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, 
                 domain TEXT,
-                site TEXT,              -- Přidáno: Site (Místo)
+                site TEXT,
                 part_number TEXT,
-                location TEXT,          -- Toto je Skladové místo (SM)
-                original_location_scan TEXT, -- Původní sken SM s prefixem
+                location TEXT,
+                original_location_scan TEXT,
                 batch TEXT, 
                 reference TEXT, 
-                original_reference_scan TEXT, -- Původní sken Reference s prefixem
-                quantity REAL,          -- Změněno na REAL pro počty
+                original_reference_scan TEXT,
+                quantity REAL,
                 scan_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-                scanned_by TEXT,        -- Uživatel (přihlášený nebo 'Spočetl')
+                scanned_by TEXT,
                 is_manual_qty BOOLEAN DEFAULT 0,
-                status TEXT             -- 'NEW', 'MATCH_OK', 'MATCH_FAIL', atd.
+                status TEXT
             );
         `);
     }
@@ -127,6 +139,7 @@ class DatabaseService {
 
 export const databaseService = new DatabaseService();
 export const initDB = databaseService.initDB.bind(databaseService);
+export const initDBSafe = databaseService.initDBSafe.bind(databaseService);
 export const addScan = databaseService.addScan.bind(databaseService);
 export const bulkAddScans = databaseService.bulkAddScans.bind(databaseService);
 export const getScans = databaseService.getScans.bind(databaseService);

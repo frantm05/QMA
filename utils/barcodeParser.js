@@ -12,65 +12,87 @@ export const parseBarcode = (scan, type, settings = {}) => {
         parsed: scan,
         isValid: true,
         error: null,
-        metadata: {} // Pro extra data ze složených kódů
+        metadata: {}
     };
 
-    if (!scan) {
+    if (!scan || scan.trim().length === 0) {
         result.isValid = false;
+        result.error = 'CHYBA: Prázdný kód';
         return result;
     }
 
     // --- Logika pro Skladové Místo (SM) ---
     if (type === 'LOCATION') {
-        const prefix = settings.smPrefix || ''; // Např. "L" nebo "SM"
+        const prefix = (settings.smPrefix !== undefined && settings.smPrefix !== null) 
+            ? settings.smPrefix 
+            : '';
         
-        if (prefix && scan.startsWith(prefix)) {
-            result.parsed = scan.substring(prefix.length);
-        } else if (prefix && !scan.startsWith(prefix)) {
-            // PDF Str 7: Pokud prefix zadán, musí začínat na prefix, jinak chyba
-            result.isValid = false;
-            result.error = `Chybný prefix SM, očekáváno "${prefix}"`;
+        if (prefix && prefix.length > 0) {
+            if (scan.startsWith(prefix)) {
+                result.parsed = scan.substring(prefix.length);
+                if (result.parsed.length === 0) {
+                    result.isValid = false;
+                    result.error = `CHYBA: Sken obsahuje pouze prefix "${prefix}", chybí hodnota SM`;
+                    return result;
+                }
+            } else {
+                result.isValid = false;
+                result.error = `CHYBA: Očekáván prefix "${prefix}" pro SM`;
+                return result;
+            }
         }
         return result;
     }
 
     // --- Logika pro Referenci / Položku ---
     if (type === 'ITEM') {
-        // Scénář 2 (PDF Str 8): Složený kód s oddělovačem #
-        // Příklad: PF3G_1260_1000#SSO123478_999#RM0000078
+        // Důležité: používáme přesně to co je v nastavení, NEPOUŽÍVÁME fallback na 'R'
+        const prefix = (settings.itemPrefix !== undefined && settings.itemPrefix !== null) 
+            ? settings.itemPrefix 
+            : '';
+
+        // Scénář 2: Složený kód s oddělovačem #
         if (scan.includes('#')) {
-            const parts = scan.split('#');
-            // Hledáme část začínající na R (Reference)
-            const refPart = parts.find(p => p.startsWith('R'));
-            
-            if (refPart) {
-                result.parsed = refPart.substring(1); // Odstraníme 'R'
-                result.metadata.full_composite = scan;
-                // Zde bychom mohli vytáhnout i šarži nebo artikl, pokud bychom znali logiku jejich prefixů
-                // Prozatím bereme, že hlavní je Reference
+            if (prefix && prefix.length > 0) {
+                const parts = scan.split('#');
+                const refPart = parts.find(p => p.startsWith(prefix));
+                
+                if (refPart) {
+                    result.parsed = refPart.substring(prefix.length);
+                    result.metadata.full_composite = scan;
+                    if (result.parsed.length === 0) {
+                        result.isValid = false;
+                        result.error = `CHYBA: Nalezen prefix "${prefix}" ve složeném kódu, ale chybí hodnota Reference`;
+                    }
+                } else {
+                    result.isValid = false;
+                    result.error = `CHYBA: Očekáván prefix "${prefix}" pro Referenci ve složeném kódu`;
+                }
             } else {
-                // Fallback pokud tam není jasné R-ko, vezmeme první část? 
-                // Dle zadání je tam vždy prefix, předpokládejme standardní chování
-                result.parsed = parts[0]; 
+                // Bez prefixu – vezmeme první část složeného kódu
+                const parts = scan.split('#');
+                result.parsed = parts[0];
+                result.metadata.full_composite = scan;
             }
             return result;
         }
 
-        // Scénář 1 (PDF Str 8): Reference s prefixem "R"
-        const prefix = settings.itemPrefix || 'R'; // Default dle zadání je často R
-        
-        if (prefix && scan.startsWith(prefix)) {
-            result.parsed = scan.substring(prefix.length);
-        } else if (prefix && !scan.startsWith(prefix)) {
-            // Scénář 3 (PDF Str 8): Reference bez prefixu (ruční zadání) - povolíme to?
-            // Pokud je to striktní nastavení:
-            // result.isValid = false;
-            // result.error = `Chybný prefix, očekáváno "${prefix}"`;
-            
-            // Ale PDF zmiňuje Scénář 3 "Reference bez prefixu", takže pokud kontrola selže, 
-            // můžeme to považovat za čistý kód (např. ruční zadání M0000078)
-            result.parsed = scan; 
+        // Scénář 1: Jednoduchý kód
+        if (prefix && prefix.length > 0) {
+            if (scan.startsWith(prefix)) {
+                result.parsed = scan.substring(prefix.length);
+                if (result.parsed.length === 0) {
+                    result.isValid = false;
+                    result.error = `CHYBA: Sken obsahuje pouze prefix "${prefix}", chybí hodnota Reference`;
+                    return result;
+                }
+            } else {
+                result.isValid = false;
+                result.error = `CHYBA: Očekáván prefix "${prefix}" pro Referenci`;
+                return result;
+            }
         }
+        // Pokud prefix je prázdný, bereme celý sken jako referenci (result.parsed = scan, už nastaveno výše)
         
         return result;
     }

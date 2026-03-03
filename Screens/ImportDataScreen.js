@@ -8,25 +8,20 @@ import apiService from '../services/apiService';
 import { StorageService } from '../utils/storage';
 
 const ImportDataScreen = ({ navigation }) => {
-    // State
     const [selectedDomain, setSelectedDomain] = useState(null);
     const [currentAccessToken, setCurrentAccessToken] = useState('');
     
-    // Data state
     const [allInventoryData, setAllInventoryData] = useState([]);
     const [sites, setSites] = useState([]);
     
-    // Selection state
-    const [selectedSite, setSelectedSite] = useState(null); // Změna: null znamená, že nic není vybráno
+    const [selectedSite, setSelectedSite] = useState(null);
     const [storageLocation, setStorageLocation] = useState('*');
     const [partFilter, setPartFilter] = useState('*');
 
-    // UI state
     const [isLoading, setIsLoading] = useState(false);
-    const [isLoadingData, setIsLoadingData] = useState(true); // Default true, začínáme hned načítat
+    const [isLoadingData, setIsLoadingData] = useState(true);
     const [statusMessage, setStatusMessage] = useState("Inicializace...");
 
-    // 1. Načtení tokenu a domény + automatické spuštění stahování dat
     useEffect(() => {
         const init = async () => {
             try {
@@ -41,7 +36,6 @@ const ImportDataScreen = ({ navigation }) => {
                 setCurrentAccessToken(token);
                 setSelectedDomain(domain);
                 
-                // Hned spustíme načítání dat pro doménu
                 loadDomainData(token, domain);
 
             } catch (error) {
@@ -58,9 +52,6 @@ const ImportDataScreen = ({ navigation }) => {
         setStatusMessage(`Načítám data pro doménu ${domain}...`);
 
         try {
-            // Používáme existující logiku - stáhni vše, pak vyfiltruj sites
-            // Poznámka: Pro optimalizaci by API mělo mít endpoint čistě pro Sites (si_mstr), 
-            // ale dle zadání "neměnit funkčnost" využíváme data z inventury.
             const inventoryData = await apiService.getInventoryDataForDomain(token, domain);
 
             if (Array.isArray(inventoryData)) {
@@ -70,7 +61,6 @@ const ImportDataScreen = ({ navigation }) => {
 
                 setAllInventoryData(filteredByDomain);
                 
-                // Extrakce unikátních míst (Sites)
                 const uniqueSites = apiService.getUniqueSitesFromData(filteredByDomain);
                 setSites(uniqueSites);
 
@@ -98,14 +88,12 @@ const ImportDataScreen = ({ navigation }) => {
         setStatusMessage(`Vyberte Místo (Site)`);
     };
 
-    // Filtrace a Import (zůstává podobné)
     const getFilteredData = () => {
         return allInventoryData.filter(item => {
             const site = item["ld_det.ld_site"] || "";
             const location = item["ld_det.ld_loc"] || "";
             const part = item["ld_det.ld_part"] || "";
 
-            // Site filter - zde je selectedSite povinný (vybrán tlačítkem)
             if (selectedSite !== '*' && site !== selectedSite) return false;
 
             const locationMatch = storageLocation === '*' ||
@@ -155,7 +143,6 @@ const ImportDataScreen = ({ navigation }) => {
         }
     };
 
-    // Renderování
     const filteredCount = (allInventoryData.length > 0 && selectedSite) ? getFilteredData().length : 0;
 
     return (
@@ -165,7 +152,6 @@ const ImportDataScreen = ({ navigation }) => {
                 <Text style={styles.subtitle}>Doména: {selectedDomain}</Text>
             </View>
 
-            {/* Status Bar */}
             <View style={styles.statusContainer}>
                 <Text style={[styles.statusMessage, { color: isLoadingData ? 'blue' : 'black' }]}>
                     {statusMessage}
@@ -176,12 +162,10 @@ const ImportDataScreen = ({ navigation }) => {
                 <ActivityIndicator size="large" color="#0000ff" style={styles.loader} />
             )}
 
-            {/* KROK 1: Výběr Místa (Zobrazit pouze pokud není vybráno a data jsou načtena) */}
             {!isLoadingData && !selectedSite && sites.length > 0 && (
                 <View style={styles.sectionContainer}>
                     <Text style={styles.sectionTitle}>Vyberte Místo (Site):</Text>
                     <View style={styles.gridContainer}>
-                        {/* Možnost Všechna místa */}
                         <TouchableOpacity 
                             style={styles.siteButton} 
                             onPress={() => handleSiteSelect('*')}
@@ -189,7 +173,6 @@ const ImportDataScreen = ({ navigation }) => {
                             <Text style={styles.siteButtonText}>VŠECHNA MÍSTA</Text>
                         </TouchableOpacity>
 
-                        {/* Jednotlivá místa */}
                         {sites.map(site => (
                             <TouchableOpacity 
                                 key={site.si_site} 
@@ -204,7 +187,6 @@ const ImportDataScreen = ({ navigation }) => {
                 </View>
             )}
 
-            {/* KROK 2: Filtry (Zobrazit až po výběru místa) */}
             {!isLoadingData && selectedSite && (
                 <View style={styles.filtersContainer}>
                     <View style={styles.selectedSiteHeader}>
@@ -212,7 +194,7 @@ const ImportDataScreen = ({ navigation }) => {
                             Vybrané místo: {selectedSite === '*' ? 'Všechna' : selectedSite}
                         </Text>
                         <TouchableOpacity onPress={handleResetSite}>
-                            <Text style={{color: 'blue', textDecorationLine: 'underline'}}>Změnit</Text>
+                            <Text style={{color: '#007bff', textDecorationLine: 'underline'}}>Změnit</Text>
                         </TouchableOpacity>
                     </View>
 
@@ -245,13 +227,12 @@ const ImportDataScreen = ({ navigation }) => {
                         onPress={handleImport}
                         disabled={filteredCount === 0}
                         isLoading={isLoading}
-                        style={styles.importButton}
                     />
                 </View>
             )}
 
-            <View style={styles.navigationContainer}>
-                <Button title="Zpět do Menu" onPress={() => navigation.goBack()} />
+            <View style={styles.bottomBar}>
+                <Button title="Zpět do Menu" onPress={() => navigation.goBack()} style={styles.backButton} />
             </View>
         </ScrollView>
     );
@@ -282,6 +263,7 @@ const styles = StyleSheet.create({
         marginBottom: 15,
         alignItems: 'center',
     },
+    statusMessage: {},
     sectionContainer: {
         flex: 1,
     },
@@ -297,7 +279,7 @@ const styles = StyleSheet.create({
     },
     siteButton: {
         width: '48%',
-        backgroundColor: '#007bff',
+        backgroundColor: '#28a745',
         padding: 15,
         borderRadius: 8,
         marginBottom: 10,
@@ -349,11 +331,16 @@ const styles = StyleSheet.create({
         marginBottom: 15,
         alignItems: 'center',
     },
-    navigationContainer: {
+    loader: {
+        marginVertical: 20,
+    },
+    bottomBar: {
         marginTop: 30,
         marginBottom: 30,
-        alignItems: 'center',
-    }
+    },
+    backButton: {
+        backgroundColor: '#007bff',
+    },
 });
 
 export default ImportDataScreen;

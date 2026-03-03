@@ -41,7 +41,6 @@ const SettingsScreen = ({ navigation }) => {
         <ScrollView contentContainerStyle={styles.container}>
             <Text style={styles.title}>Nastavení aplikace</Text>
 
-            {/* Sekce Prefixy */}
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Prefixy čárových kódů</Text>
                 
@@ -53,18 +52,24 @@ const SettingsScreen = ({ navigation }) => {
                     placeholder="Např. L (nechte prázdné pro žádný)"
                     autoCapitalize="characters"
                 />
+                <Text style={styles.hint}>
+                    Pokud je vyplněn, skenovaný kód musí začínat tímto prefixem. Prefix bude odstraněn.
+                </Text>
 
                 <Text style={styles.label}>Prefix Reference / Položky:</Text>
                 <TextInput
                     style={styles.input}
                     value={itemPrefix}
                     onChangeText={setItemPrefix}
-                    placeholder="Např. R"
+                    placeholder="Např. R (nechte prázdné pro žádný)"
                     autoCapitalize="characters"
                 />
+                <Text style={styles.hint}>
+                    Pokud je vyplněn (např. "R"), skenovaná Reference musí začínat tímto prefixem. Prefix bude odstraněn.{'\n'}
+                    Prázdné = bez validace prefixu.
+                </Text>
             </View>
 
-            {/* Sekce Chování */}
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Chování skeneru</Text>
 
@@ -87,8 +92,11 @@ const SettingsScreen = ({ navigation }) => {
                         onValueChange={setCheckAgainstDb}
                     />
                 </View>
+                <Text style={styles.hint}>
+                    Platí pouze v online režimu. V offline se nedohledává.
+                </Text>
 
-                 <View style={styles.switchRow}>
+                <View style={styles.switchRow}>
                     <Text style={styles.switchLabel}>Zadávat množství ručně?</Text>
                     <Switch
                         value={manualQty}
@@ -97,9 +105,13 @@ const SettingsScreen = ({ navigation }) => {
                 </View>
             </View>
 
-            <Button title="Uložit nastavení" onPress={handleSave} />
-            <View style={{height: 10}} />
-            <Button title="Zpět" onPress={() => navigation.goBack()} style={{backgroundColor: '#666'}} />
+            <View style={styles.actionRow}>
+                <Button title="Uložit nastavení" onPress={handleSave} />
+            </View>
+
+            <View style={styles.bottomBar}>
+                <Button title="Zpět do Menu" onPress={() => navigation.goBack()} style={styles.backButton} />
+            </View>
         </ScrollView>
     );
 };
@@ -160,7 +172,16 @@ const styles = StyleSheet.create({
         color: '#666',
         marginBottom: 10,
         fontStyle: 'italic',
-    }
+    },
+    actionRow: {
+        marginBottom: 10,
+    },
+    bottomBar: {
+        marginTop: 20,
+    },
+    backButton: {
+        backgroundColor: '#007bff',
+    },
 });
 
 export default SettingsScreen;

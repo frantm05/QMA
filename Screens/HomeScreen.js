@@ -1,21 +1,16 @@
 // Screens/HomeScreen.js
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import Button from '../Components/Button';
 import { StorageService } from '../utils/storage';
 
 const HomeScreen = ({ navigation, route }) => {
-    // Získáme parametr z navigace, zda jsme offline
-    // Pokud jdeme přes DomainSelection (online), parametr tam nebude, takže default false.
-    // Ale pozor: musíme zjistit doménu nebo "Offline Mode" text.
-    
     const [displayHeader, setDisplayHeader] = useState('Načítání...');
     const [isOfflineMode, setIsOfflineMode] = useState(false);
     const [userId, setUserId] = useState('');
 
     useEffect(() => {
         const init = async () => {
-            // Parametr předaný z LoginScreen
             const offlineParam = route.params?.isOffline || false;
             setIsOfflineMode(offlineParam);
 
@@ -39,7 +34,6 @@ const HomeScreen = ({ navigation, route }) => {
 
     return (
         <View style={styles.container}>
-            {/* Hlavička s informacemi */}
             <View style={styles.headerContainer}>
                 <Text style={styles.userText}>Uživatel: {userId}</Text>
                 <Text style={[styles.domainText, isOfflineMode && styles.offlineText]}>
@@ -50,7 +44,6 @@ const HomeScreen = ({ navigation, route }) => {
             <Text style={styles.menuTitle}>Hlavní Menu</Text>
 
             <View style={styles.menuContainer}>
-                {/* 1. Import Dat - POUZE ONLINE */}
                 {!isOfflineMode && (
                     <View style={styles.buttonWrapper}>
                         <Button 
@@ -60,20 +53,24 @@ const HomeScreen = ({ navigation, route }) => {
                     </View>
                 )}
 
-                {/* 2. Čtečka - VŽDY */}
                 <View style={styles.buttonWrapper}>
                     <Button 
-                        title="Čtečka" 
+                        title="Skenování" 
                         onPress={() => navigation.navigate("Reader")} 
                     />
                 </View>
 
-                {/* 3. Nastavení - VŽDY (důležité pro Offline) */}
+                <View style={styles.buttonWrapper}>
+                    <Button 
+                        title="Offline Data / Export" 
+                        onPress={() => navigation.navigate("OfflineInventory")} 
+                    />
+                </View>
+
                 <View style={styles.buttonWrapper}>
                     <Button 
                         title="Nastavení" 
                         onPress={() => navigation.navigate("Settings")} 
-                        style={{backgroundColor: '#6c757d'}} // Šedá barva pro odlišení
                     />
                 </View>
             </View>
@@ -117,7 +114,7 @@ const styles = StyleSheet.create({
         color: '#007bff',
     },
     offlineText: {
-        color: '#dc3545', // Červená pro offline
+        color: '#dc3545',
     },
     menuTitle: {
         fontSize: 24,
@@ -126,15 +123,15 @@ const styles = StyleSheet.create({
     },
     menuContainer: {
         width: '100%',
-        alignItems: 'center',
+        paddingHorizontal: 30,
     },
     buttonWrapper: {
-        width: '80%',
-        marginBottom: 15,
+        marginBottom: 12,
     },
     logoutWrapper: {
-        marginTop: 'auto', // Tlačítko dolů
-        width: '60%',
+        marginTop: 'auto',
+        width: '100%',
+        paddingHorizontal: 30,
         marginBottom: 20,
     }
 });

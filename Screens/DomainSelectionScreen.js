@@ -67,7 +67,10 @@ const DomainSelectionScreen = ({ navigation }) => {
                 ))}
             </View>
             <View style={styles.logoutWrapper}>
-                <Button title="Odhlásit" onPress={() => navigation.replace("Login")} />
+                <Button title="Odhlásit se" onPress={async () => {
+                    await StorageService.clearAuth();
+                    navigation.replace("Login");
+                }} style={{backgroundColor: '#dc3545'}} />
             </View>
         </View>
     );
@@ -87,15 +90,15 @@ const styles = StyleSheet.create({
     },
     listContainer: {
         width: '100%',
-        alignItems: 'center',
+        paddingHorizontal: 30,
     },
     buttonWrapper: {
-        width: '80%',
-        marginBottom: 15,
+        marginBottom: 12,
     },
     logoutWrapper: {
         marginTop: 30,
-        width: '60%',
+        width: '100%',
+        paddingHorizontal: 30,
     }
 });
 
